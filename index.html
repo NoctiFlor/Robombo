@@ -1,0 +1,524 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Robombo - Robot Süpürge & House Flipper</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700;800;900&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css" />
+  <!-- Three.js CDN -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+</head>
+<body>
+  <!-- 3D Canvas Container -->
+  <div id="canvas-container"></div>
+
+  <!-- UV Blacklight Mode Vignette Overlay (Pointer events strictly none) -->
+  <div id="uv-overlay" class="uv-overlay hidden">
+    <div class="uv-scanlines"></div>
+  </div>
+
+  <!-- Main Game HUD Overlay -->
+  <div id="hud">
+    <!-- Top Header Bar -->
+    <header class="top-bar">
+      <div class="level-info glass-card" id="btn-open-portfolio" title="Emlak Portföyü / Daire Seç" style="cursor: pointer;">
+        <div class="brand-tag">🤖 ROBOMBO FLIPPER</div>
+        <div class="level-badge" id="level-badge">MÜLK #1</div>
+        <div class="room-title" id="room-name">Terk Edilmiş Bekar Evi</div>
+        <div class="portfolio-hint">Daireleri Değiştir 🔄</div>
+      </div>
+
+      <div class="stats-group">
+        <!-- Cleanliness Progress -->
+        <div class="stat-card glass-card">
+          <div class="stat-header">
+            <span class="stat-icon">✨</span>
+            <span class="stat-label">TEMİZLİK</span>
+            <span class="stat-value" id="clean-percent">0%</span>
+          </div>
+          <div class="progress-bar-bg">
+            <div class="progress-bar-fill clean-fill" id="clean-bar" style="width: 0%"></div>
+          </div>
+        </div>
+
+        <!-- Mop Polish Shine Progress -->
+        <div class="stat-card glass-card mop-stat-card" id="mop-stat-box">
+          <div class="stat-header">
+            <span class="stat-icon">💦</span>
+            <span class="stat-label">PARLAKLIK</span>
+            <span class="stat-value" id="shine-percent">0%</span>
+          </div>
+          <div class="progress-bar-bg">
+            <div class="progress-bar-fill shine-fill" id="shine-bar" style="width: 0%"></div>
+          </div>
+        </div>
+
+        <!-- Room Market Valuation (House Flipper) -->
+        <div class="stat-card glass-card val-card" id="flipper-val-box" title="Evin Güncel Piyasa Değeri">
+          <div class="stat-header">
+            <span class="stat-icon">🏠</span>
+            <span class="stat-label">EV DEĞERİ</span>
+            <span class="stat-value" id="house-value">₺15,000</span>
+          </div>
+        </div>
+
+        <!-- Coin / Money -->
+        <div class="stat-card glass-card coin-card">
+          <span class="coin-icon">🪙</span>
+          <span class="coin-value" id="coin-amount">0</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- Left Status Bars (Battery, Dustbin & Water Tank) -->
+    <div class="status-panel">
+      <!-- Battery Bar -->
+      <div class="meter-card glass-card" id="battery-meter-card">
+        <div class="meter-header">
+          <span class="meter-icon" id="battery-icon">🔋</span>
+          <span class="meter-title">ŞARJ</span>
+          <span class="meter-text" id="battery-text">100%</span>
+        </div>
+        <div class="vertical-bar-bg">
+          <div class="vertical-bar-fill battery-fill" id="battery-bar" style="height: 100%"></div>
+        </div>
+        <div class="status-tag" id="battery-status">Dolu</div>
+      </div>
+
+      <!-- Dustbin Bar -->
+      <div class="meter-card glass-card" id="dust-meter-card">
+        <div class="meter-header">
+          <span class="meter-icon">🗑️</span>
+          <span class="meter-title">HAZNE</span>
+          <span class="meter-text" id="dust-text">0/50g</span>
+        </div>
+        <div class="vertical-bar-bg">
+          <div class="vertical-bar-fill dust-fill" id="dust-bar" style="height: 0%"></div>
+        </div>
+        <div class="status-tag" id="dust-status">Boş</div>
+      </div>
+
+      <!-- Water Tank Bar (For Mop) -->
+      <div class="meter-card glass-card" id="water-meter-card">
+        <div class="meter-header">
+          <span class="meter-icon">💧</span>
+          <span class="meter-title">SU</span>
+          <span class="meter-text" id="water-text">100%</span>
+        </div>
+        <div class="vertical-bar-bg">
+          <div class="vertical-bar-fill water-fill" id="water-bar" style="height: 100%"></div>
+        </div>
+        <div class="status-tag" id="water-status">Mop Yok</div>
+      </div>
+    </div>
+
+    <!-- Mini High-Tech LiDAR Radar -->
+    <div class="radar-panel glass-card" id="radar-box">
+      <div class="radar-header">
+        <span class="radar-live-dot"></span>
+        <span class="radar-title">LİDAR HARİTA</span>
+      </div>
+      <canvas id="radar-canvas" width="130" height="130"></canvas>
+    </div>
+
+    <!-- Floating In-Game Toast Notifications -->
+    <div id="toast" class="toast hidden"></div>
+
+    <!-- UV Active Sleek Pill Badge -->
+    <div id="uv-badge" class="uv-pill-badge hidden">
+      🔦 UV FENER AÇIK (Fosforlu Lekeler Görünür)
+    </div>
+
+    <!-- Quick Action Controls (Turbo, UV, Camera Mode, House Flipper, Dock Home, Workshop) -->
+    <div class="quick-actions">
+      <button class="action-btn glass-btn highlight-turbo" id="btn-turbo-boost" title="Turbo Hız & Vakum (Boşluk Tuşu)">
+        <span>⚡</span>
+        <label>TURBO</label>
+      </button>
+
+      <button class="action-btn glass-btn uv-btn" id="btn-uv-toggle" title="UV Mor Işık Dedektif Modu (U / F Tuşu)">
+        <span id="uv-icon">🔦</span>
+        <label id="uv-label">UV IŞIK</label>
+      </button>
+
+      <button class="action-btn glass-btn" id="btn-camera-toggle" title="Kamera Modunu Değiştir (C Tuşu)">
+        <span id="cam-icon">👁️</span>
+        <label id="cam-label">1. Şahıs Kokpit</label>
+      </button>
+
+      <button class="action-btn glass-btn flipper-btn" id="btn-flipper-open" title="House Flipper - Mobilya Al & Evi Yenile">
+        <span>🛋️</span>
+        <label>Ev Yenile</label>
+      </button>
+
+      <button class="action-btn glass-btn" id="btn-dock-home" title="İstasyona Otomatik Dön (H Tuşu)">
+        <span>🏠</span>
+        <label id="dock-label">İstasyona Dön</label>
+      </button>
+
+      <button class="action-btn glass-btn highlight-btn" id="btn-shop-open" title="Robombo Atölyesi & Geliştirme">
+        <span>🛠️</span>
+        <label>Geliştir</label>
+      </button>
+
+      <button class="action-btn glass-btn" id="btn-ctrl-toggle" title="Kontrol Modu: D-PAD / Joystick">
+        <span id="ctrl-mode-icon">🕹️</span>
+        <label id="ctrl-mode-label">D-PAD</label>
+      </button>
+
+      <button class="action-btn glass-btn icon-only" id="btn-sound-toggle" title="ASMR Ses Aç/Kapat">
+        <span id="sound-icon">🔊</span>
+      </button>
+    </div>
+
+    <!-- D-PAD Touch Controls -->
+    <div id="dpad-zone" class="dpad-container">
+      <button class="dpad-btn dpad-up" id="dpad-up">▲</button>
+      <div class="dpad-mid-row">
+        <button class="dpad-btn dpad-left" id="dpad-left">◀</button>
+        <div class="dpad-center">●</div>
+        <button class="dpad-btn dpad-right" id="dpad-right">▶</button>
+      </div>
+      <button class="dpad-btn dpad-down" id="dpad-down">▼</button>
+    </div>
+
+    <!-- Dynamic Virtual Joystick -->
+    <div id="joystick-zone" class="hidden">
+      <div id="joystick-base">
+        <div id="joystick-thumb"></div>
+      </div>
+      <div class="joystick-hint">Yönlendirmek için kaydırın</div>
+    </div>
+  </div>
+
+  <!-- Upgrade & Skin & House Flipper Shop Modal -->
+  <div id="shop-modal" class="modal-backdrop hidden">
+    <div class="modal-window glass-modal large-modal">
+      <div class="modal-header">
+        <h2 id="modal-main-title">🛠️ Robombo Atölyesi & House Flipper</h2>
+        <button class="close-btn" id="btn-shop-close">&times;</button>
+      </div>
+
+      <div class="shop-balance">
+        <span>Kasanız:</span>
+        <strong id="shop-coin-amount">🪙 0</strong>
+      </div>
+
+      <div class="shop-tabs">
+        <button class="tab-btn active" data-tab="flipper">🛋️ House Flipper (Ev Yenile)</button>
+        <button class="tab-btn" data-tab="upgrades">⚙️ Motor & Vakum</button>
+        <button class="tab-btn" data-tab="modules">🚀 Özel Modüller</button>
+        <button class="tab-btn" data-tab="skins">🎨 Görünümler</button>
+      </div>
+
+      <!-- Tab 1: House Flipper Furniture Renovation -->
+      <div class="shop-tab-content" id="tab-flipper">
+        <div class="flipper-intro">
+          <div class="flipper-stats">
+            <div>Oda Temizliği: <span id="flipper-clean-val">%0</span></div>
+            <div>Güncel Piyasa Değeri: <strong id="flipper-house-val">₺15,000</strong></div>
+          </div>
+          <p class="flipper-tip">💡 Mobilyaları yenileyin, odayı pırıl pırıl yapıp müşterilere en yüksek kârla satın!</p>
+        </div>
+
+        <div class="furniture-grid">
+          <!-- Item: Velvet Sofa -->
+          <div class="furniture-card" id="furn-card-sofa">
+            <div class="furn-icon">🛋️</div>
+            <div class="furn-info">
+              <div class="furn-title">Zümrüt Yeşili İtalyan Kadife Koltuk</div>
+              <div class="furn-val">+₺4,500 Ev Değeri</div>
+            </div>
+            <button class="buy-btn" id="buy-furn-sofa" data-cost="80">🪙 80</button>
+          </div>
+
+          <!-- Item: OLED Curved TV -->
+          <div class="furniture-card" id="furn-card-tv">
+            <div class="furn-icon">📺</div>
+            <div class="furn-info">
+              <div class="furn-title">85" OLED Curved TV & Sinema Seti</div>
+              <div class="furn-val">+₺5,500 Ev Değeri</div>
+            </div>
+            <button class="buy-btn" id="buy-furn-tv" data-cost="110">🪙 110</button>
+          </div>
+
+          <!-- Item: Marble Table -->
+          <div class="furniture-card" id="furn-card-table">
+            <div class="furn-icon">☕</div>
+            <div class="furn-info">
+              <div class="furn-title">Carrara Mermer & Altın Orta Sehpa</div>
+              <div class="furn-val">+₺2,800 Ev Değeri</div>
+            </div>
+            <button class="buy-btn" id="buy-furn-table" data-cost="60">🪙 60</button>
+          </div>
+
+          <!-- Item: RGB Neon Lamp -->
+          <div class="furniture-card" id="furn-card-lamp">
+            <div class="furn-icon">💡</div>
+            <div class="furn-info">
+              <div class="furn-title">Ambient RGB Lambader</div>
+              <div class="furn-val">+₺1,800 Ev Değeri</div>
+            </div>
+            <button class="buy-btn" id="buy-furn-lamp" data-cost="45">🪙 45</button>
+          </div>
+
+          <!-- Item: Monstera Plant -->
+          <div class="furniture-card" id="furn-card-plant">
+            <div class="furn-icon">🌿</div>
+            <div class="furn-info">
+              <div class="furn-title">Dev Monstera & Seramik Saksı</div>
+              <div class="furn-val">+₺1,400 Ev Değeri</div>
+            </div>
+            <button class="buy-btn" id="buy-furn-plant" data-cost="35">🪙 35</button>
+          </div>
+        </div>
+
+        <div class="flip-sell-bar">
+          <button class="btn-primary btn-large btn-gold" id="btn-open-sell-modal">🏠 Evi Satışa Çıkar (Müşteri Teklifleri Al)</button>
+        </div>
+      </div>
+
+      <!-- Tab 2: Standard Upgrades -->
+      <div class="shop-tab-content hidden" id="tab-upgrades">
+        <!-- Upgrade: Speed -->
+        <div class="upgrade-item">
+          <div class="up-icon">🏎️</div>
+          <div class="up-info">
+            <div class="up-name">Robombo Motor Hızı</div>
+            <div class="up-desc" id="up-speed-desc">Robotu hızlandırır ve sürme kontrolünü kolaylaştırır</div>
+          </div>
+          <button class="buy-btn" id="buy-speed" data-cost="50">
+            <span>🪙 <span class="cost">50</span></span>
+          </button>
+        </div>
+
+        <!-- Upgrade: MOP ATTACHMENT -->
+        <div class="upgrade-item hero-upgrade" id="mop-upgrade-card">
+          <div class="up-icon">💦</div>
+          <div class="up-info">
+            <div class="up-name">Akıllı Islak Mop / Paspas Eklentisi</div>
+            <div class="up-desc" id="up-mop-desc">Süpürdükten sonra yeri parlatır & sıvı lekeleri köpürtüp siler!</div>
+          </div>
+          <button class="buy-btn mop-buy-btn" id="buy-mop" data-cost="75">
+            <span>🪙 <span class="cost">75</span></span>
+          </button>
+        </div>
+
+        <!-- Upgrade: Water Tank -->
+        <div class="upgrade-item">
+          <div class="up-icon">💧</div>
+          <div class="up-info">
+            <div class="up-name">Mop Su Deposu Kapasitesi</div>
+            <div class="up-desc" id="up-water-desc">Daha uzun süre ıslak silme yapabilme</div>
+          </div>
+          <button class="buy-btn" id="buy-water" data-cost="50">
+            <span>🪙 <span class="cost">50</span></span>
+          </button>
+        </div>
+
+        <!-- Upgrade: Battery -->
+        <div class="upgrade-item">
+          <div class="up-icon">🔋</div>
+          <div class="up-info">
+            <div class="up-name">Batarya Kapasitesi</div>
+            <div class="up-desc" id="up-battery-desc">Daha uzun süre çalışma süresi</div>
+          </div>
+          <button class="buy-btn" id="buy-battery" data-cost="40">
+            <span>🪙 <span class="cost">40</span></span>
+          </button>
+        </div>
+
+        <!-- Upgrade: Charge Speed -->
+        <div class="upgrade-item">
+          <div class="up-icon">⚡</div>
+          <div class="up-info">
+            <div class="up-name">Hızlı Şarj İstasyonu</div>
+            <div class="up-desc" id="up-charge-desc">İstasyonda 2 kat hızlı batarya dolumu</div>
+          </div>
+          <button class="buy-btn" id="buy-charge" data-cost="50">
+            <span>🪙 <span class="cost">50</span></span>
+          </button>
+        </div>
+
+        <!-- Upgrade: Suction Power -->
+        <div class="upgrade-item">
+          <div class="up-icon">🌪️</div>
+          <div class="up-info">
+            <div class="up-name">Vakum Emiş Gücü</div>
+            <div class="up-desc" id="up-suction-desc">Daha geniş toz ve kırıntı çekme alanı</div>
+          </div>
+          <button class="buy-btn" id="buy-suction" data-cost="45">
+            <span>🪙 <span class="cost">45</span></span>
+          </button>
+        </div>
+
+        <!-- Upgrade: Dustbin -->
+        <div class="upgrade-item">
+          <div class="up-icon">📦</div>
+          <div class="up-info">
+            <div class="up-name">Toz Haznesi Boyutu</div>
+            <div class="up-desc" id="up-bin-desc">Daha fazla çöp depolama hacmi</div>
+          </div>
+          <button class="buy-btn" id="buy-bin" data-cost="40">
+            <span>🪙 <span class="cost">40</span></span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Tab 3: Special Tech Modules -->
+      <div class="shop-tab-content hidden" id="tab-modules">
+        <!-- Module: Magnet -->
+        <div class="upgrade-item" id="mod-magnet-card">
+          <div class="up-icon">🧲</div>
+          <div class="up-info">
+            <div class="up-name">Manyetik Para & Hurda Mıknatısı</div>
+            <div class="up-desc">Etraftaki madeni paraları ve metal nesneleri robota çeker!</div>
+          </div>
+          <button class="buy-btn" id="buy-mod-magnet" data-cost="100">
+            <span>🪙 <span class="cost">100</span></span>
+          </button>
+        </div>
+
+        <!-- Module: Steam Blaster -->
+        <div class="upgrade-item" id="mod-steam-card">
+          <div class="up-icon">💨</div>
+          <div class="up-info">
+            <div class="up-name">Sıcak Buhar & Köpük Püskürtücü</div>
+            <div class="up-desc">İnatçı kahve ve çamur lekelerini köpürterek 2 kat hızlı çözer!</div>
+          </div>
+          <button class="buy-btn" id="buy-mod-steam" data-cost="130">
+            <span>🪙 <span class="cost">130</span></span>
+          </button>
+        </div>
+
+        <!-- Module: Laser Turret -->
+        <div class="upgrade-item" id="mod-laser-card">
+          <div class="up-icon">🔴</div>
+          <div class="up-info">
+            <div class="up-name">Toz İmha Lazeri</div>
+            <div class="up-desc">Robotun önündeki uzaktaki toz yumaklarını otomatik yakar!</div>
+          </div>
+          <button class="buy-btn" id="buy-mod-laser" data-cost="160">
+            <span>🪙 <span class="cost">160</span></span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Tab 4: Skins -->
+      <div class="shop-tab-content hidden" id="tab-skins">
+        <div class="skins-grid">
+          <div class="skin-card active" data-skin="white">
+            <div class="skin-preview skin-white"></div>
+            <div class="skin-title">Klasik Beyaz Robombo</div>
+            <button class="skin-select-btn selected">Kullanılıyor</button>
+          </div>
+          <div class="skin-card" data-skin="black">
+            <div class="skin-preview skin-black"></div>
+            <div class="skin-title">Mat Gece Siyahı</div>
+            <button class="skin-select-btn" data-cost="60">🪙 60</button>
+          </div>
+          <div class="skin-card" data-skin="cyber">
+            <div class="skin-preview skin-cyber"></div>
+            <div class="skin-title">Cyber Neon RGB</div>
+            <button class="skin-select-btn" data-cost="120">🪙 120</button>
+          </div>
+          <div class="skin-card" data-skin="gold">
+            <div class="skin-preview skin-gold"></div>
+            <div class="skin-title">24K Altın Kaplama</div>
+            <button class="skin-select-btn" data-cost="200">🪙 200</button>
+          </div>
+          <div class="skin-card" data-skin="cat">
+            <div class="skin-preview skin-cat">🐱</div>
+            <div class="skin-title">Kedi Sürücü (Cat Rider)</div>
+            <button class="skin-select-btn" data-cost="150">🪙 150</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Real Estate Portfolio Modal (Daireler Haritası) -->
+  <div id="portfolio-modal" class="modal-backdrop hidden">
+    <div class="modal-window glass-modal large-modal">
+      <div class="modal-header">
+        <h2>🗺️ House Flipper Emlak Portföyü</h2>
+        <button class="close-btn" id="btn-portfolio-close">&times;</button>
+      </div>
+      <p class="modal-desc">Yenilemek ve temizlemek istediğiniz mülkü seçin:</p>
+
+      <div class="portfolio-grid" id="portfolio-list">
+        <!-- Dynamically rendered properties -->
+      </div>
+    </div>
+  </div>
+
+  <!-- House Flipper Flip & Sell Buyer Offers Modal -->
+  <div id="sell-modal" class="modal-backdrop hidden">
+    <div class="modal-window glass-modal win-content">
+      <div class="win-trophy">🏡</div>
+      <h2>House Flipper - Canlı Alıcı Teklifleri</h2>
+      <p>Yenileyip temizlediğiniz bu ev için alıcılar sıraya girdi!</p>
+
+      <div class="buyers-list" id="buyers-offers-container">
+        <!-- Buyers dynamically populated -->
+      </div>
+
+      <div class="win-buttons">
+        <button class="btn-secondary" id="btn-cancel-sell">Yenilemeye Devam Et 🛠️</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Out of Battery / Game Over Modal -->
+  <div id="gameover-modal" class="modal-backdrop hidden">
+    <div class="modal-window glass-modal gameover-content">
+      <div class="gameover-icon">🪫</div>
+      <h2>Robombo'nun Şarjı Bitti!</h2>
+      <p>Robot süpürgeniz yolda kaldı ve istasyona ulaşamadı.</p>
+
+      <div class="win-buttons">
+        <button class="btn-primary" id="btn-revive">İstasyona Çek & Şarj Et ⚡</button>
+        <button class="btn-secondary" id="btn-restart-gameover">Odayı Baştan Başlat 🔄</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Start Splash Screen / Intro -->
+  <div id="start-screen" class="modal-backdrop">
+    <div class="modal-window glass-modal start-box">
+      <div class="brand-logo">
+        <div class="logo-circle">🤖</div>
+        <h1>ROBOMBO FLIPPER</h1>
+      </div>
+      <p class="tagline">Gerçekçi Robot Süpürge & House Flipper Deneyimi</p>
+      
+      <div class="how-to-play">
+        <div class="tip-item">
+          <span>👁️</span>
+          <p><strong>Kokpit Kamerası:</strong> 1. Şahıs modunda robotun önünü ve fırçalarını araba kaputu gibi görerek sürün!</p>
+        </div>
+        <div class="tip-item">
+          <span>🛋️</span>
+          <p><strong>House Flipper:</strong> Pis evi süpürün, mopla parlatın, lüks mobilyalar alıp en yüksek kârla satın!</p>
+        </div>
+        <div class="tip-item">
+          <span>🔦</span>
+          <p><strong>UV Işık Modu:</strong> U veya F tuşu ile gizli fosforlu lekeleri ve saklı altınları keşfedin!</p>
+        </div>
+        <div class="tip-item">
+          <span>🏠</span>
+          <p><strong>Akıllı İstasyon:</strong> "İstasyona Dön"e basınca Robombo otonom olarak dönüp şarj olur!</p>
+        </div>
+      </div>
+
+      <button class="btn-primary btn-large btn-gold" id="btn-start-game">KOLTUĞA GEÇ & ROBOMBO'YU BAŞLAT 🚀</button>
+    </div>
+  </div>
+
+  <!-- Game Logic Script -->
+  <script src="game.js"></script>
+</body>
+</html>
