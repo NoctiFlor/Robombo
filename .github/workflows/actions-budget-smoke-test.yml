@@ -1,0 +1,21 @@
+name: Actions budget smoke test
+
+on:
+  push:
+    branches:
+      - test/actions-budget-check-20261123
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Confirm Actions Linux runner starts
+        shell: bash
+        run: |
+          echo "Robombo GitHub Actions smoke test: runner started successfully."
+          echo "Artifact upload: disabled."
